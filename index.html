@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نبراس ( ذكاء اصطناعي عراقي)</title>
+    <title>AI Chat Assistant</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
@@ -223,7 +223,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
                     </svg>
                 </div>
-                <h1 class="text-3xl font-extrabold bg-gradient-to-r from-[#6c63ff] to-[#a78bfa] bg-clip-text text-transparent">نبراس ( ذكاء اصطناعي عراقي)</h1>
+                <h1 class="text-3xl font-extrabold bg-gradient-to-r from-[#6c63ff] to-[#a78bfa] bg-clip-text text-transparent">AI Chat Assistant</h1>
                 <p class="text-gray-400 mt-2 text-sm" id="authSubtitle">مرحباً بك! سجّل دخولك للمتابعة</p>
             </div>
 
@@ -402,7 +402,7 @@
                             </svg>
                         </div>
                         <div>
-                            <h2 class="font-bold text-white text-sm md:text-base">نبراس ( ذكاء اصطناعي عراقي)</h2>
+                            <h2 class="font-bold text-white text-sm md:text-base">AI Chat Assistant</h2>
                             <p class="text-xs text-green-400 flex items-center gap-1">
                                 <span class="w-2 h-2 bg-green-400 rounded-full inline-block"></span>
                                 متصل
@@ -495,12 +495,12 @@
             //    ⚠️ المفتاح أدناه هو Publishable Key وليس Anon Key
             //    استبدله بالمفتاح الصحيح الذي يبدأ بـ eyJhbGciOi...
             // ──────────────────────────────────────────────────────────
-            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.REPLACE_WITH_YOUR_REAL_ANON_KEY',
+            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJndm1xbGh4anFzZmlpcm52eWhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODMzNDIsImV4cCI6MjA4Nzg1OTM0Mn0.vvhK0fuSpwuYA3ipaUe_g4-cSM5W17TvH2w5f6Rqg30',
 
             // ──────────────────────────────────────────────────────────
             // 🔗 n8n Webhook URL
             // ──────────────────────────────────────────────────────────
-            webhookUrl: 'https://yosifhkem2.app.n8n.cloud/webhook/chat-backend',
+            webhookUrl: 'https://yosifhkem2.app.n8n.cloud/webhook-test/chat-assistant',
         };
 
         // ===== SUPABASE CLIENT =====
@@ -1021,102 +1021,45 @@
             removeImage();
 
             state.isLoading = true;
-            updateSendButton(true);
             showTypingIndicator();
 
             try {
-                let response;
+                const formData = new FormData();
+                formData.append('sessionId', state.sessionId);
+                formData.append('chatInput', text || '(صورة مرفقة)');
+                if (file) formData.append('file', file, file.name);
 
-                if (file) {
-                    // ── إرسال بـ FormData عند وجود صورة ──
-                    const formData = new FormData();
-                    formData.append('sessionId', state.sessionId);
-                    formData.append('chatInput', text || '(صورة مرفقة)');
-                    formData.append('file', file, file.name);
-
-                    response = await fetch(CONFIG.webhookUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': 'Bearer ' + state.accessToken
-                        },
-                        body: formData
-                    });
-                } else {
-                    // ── إرسال بـ JSON عند النص فقط (مثل كود n8n الأصلي) ──
-                    response = await fetch(CONFIG.webhookUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + state.accessToken
-                        },
-                        body: JSON.stringify({
-                            chatInput: text,
-                            sessionId: state.sessionId
-                        })
-                    });
-                }
+                const response = await fetch(CONFIG.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + state.accessToken },
+                    body: formData
+                });
 
                 removeTypingIndicator();
+                if (!response.ok) throw new Error('Network error: ' + response.status);
 
-                if (!response.ok) {
-                    throw new Error('خطأ في الاتصال: ' + response.status + ' ' + response.statusText);
-                }
-
-                // ── تحليل الرد ──
-                const responseText = await response.text();
+                const data = await response.json();
                 let botReply = '';
 
-                try {
-                    const data = JSON.parse(responseText);
-
-                    if (typeof data === 'string') {
-                        botReply = data;
-                    } else if (Array.isArray(data)) {
-                        botReply = data.map(i => i.output || i.text || i.message || JSON.stringify(i)).join('\n');
-                    } else if (data.output) {
-                        botReply = data.output;
-                    } else if (data.text) {
-                        botReply = data.text;
-                    } else if (data.message) {
-                        botReply = data.message;
-                    } else if (data.response) {
-                        botReply = data.response;
-                    } else {
-                        botReply = JSON.stringify(data, null, 2);
-                    }
-                } catch (parseErr) {
-                    // الرد ليس JSON، اعرضه كنص عادي
-                    botReply = responseText;
-                }
+                if (typeof data === 'string') botReply = data;
+                else if (Array.isArray(data)) botReply = data.map(i => i.output || i.text || i.message || JSON.stringify(i)).join('\n');
+                else if (data.output) botReply = data.output;
+                else if (data.text) botReply = data.text;
+                else if (data.message) botReply = data.message;
+                else if (data.response) botReply = data.response;
+                else botReply = JSON.stringify(data, null, 2);
 
                 appendBotMessage(botReply, true);
                 if (currentChat) currentChat.messages.push({ type: 'bot', content: botReply });
 
             } catch (error) {
                 removeTypingIndicator();
-                console.error('❌ Webhook error:', error.message);
-
-                // ── إذا فشل الاتصال، عرض رد تجريبي مع تنبيه ──
-                const errorNote = `> ⚠️ **لم يتم الاتصال بـ n8n:** ${error.message}\n> تأكد من أن الـ Webhook في وضع **Execute Workflow** (وليس Test فقط)\n\n---\n\n`;
-                const demoReply = errorNote + getDemoResponse(text);
+                const demoReply = getDemoResponse(text);
                 appendBotMessage(demoReply, true);
                 if (currentChat) currentChat.messages.push({ type: 'bot', content: demoReply });
             }
 
             state.isLoading = false;
-            updateSendButton(false);
-        }
-
-        // ===== تحديث زر الإرسال أثناء التحميل =====
-        function updateSendButton(loading) {
-            const btn = document.getElementById('sendBtn');
-            if (loading) {
-                btn.disabled = true;
-                btn.innerHTML = '<svg class="w-5 h-5 animate-spin-slow" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
-            } else {
-                btn.disabled = false;
-                btn.innerHTML = '<svg class="w-5 h-5 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>';
-            }
         }
 
         function getDemoResponse(text) {
